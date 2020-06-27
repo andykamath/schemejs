@@ -1,0 +1,8 @@
+(lambda (x) x)
+(define x 5)
+(define (x) (+ 5 x))
+(define x (+ 5 (+ 10 (+ 5 10))))
+(define x (lambda (y) (+ 10 y)))
+(struct andy (name age))
+(define myAndy (make-andy "Andy" 42))
+(andy-name myAndy)
