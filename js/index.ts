@@ -17,10 +17,21 @@ let definedOps = {
     "=": (args) => args.reduce((prev, current) => evaluate(prev) == evaluate(current)),
     ">": (args) => args[0] > args[1],
     "if": (args) => evaluate(args[0]) ? evaluate(args[1]) : evaluate(args[2]),
+    "zero?": (args) => evaluate(args) == 0,
+    "cons": (args) => ["cons", args[0], args[1]],
 }
 
 let defined = (op, params) => {
     evaluatingLog(op, params)
+    // if(op instanceof Array && op[0] == 'lambda') {
+    //     console.log("LAMBDA PARAMS", params)
+    //     returnLog(op, "NEW FUNCTION", params)
+    //     return (terms) => {
+    //         if(terms instanceof Array) return evaluate([op, ...terms])
+    //         return evaluate([op, terms])
+    //     }
+    // }
+    console.log("USING OP", op, definedOps, definedOps[op])
     const toReturn = definedOps[op](params)
     returnLog(op, toReturn, params)
     return toReturn
@@ -34,7 +45,7 @@ let evaluateFunction = (params) => {
     }
     const operator = params[0];
     if(operator == 'if') console.log("IF FOUND HERE")
-    const newParams = params.slice(1) //.map(evaluateFunction);
+    const newParams = params.slice(1);
     const toReturn = defined(operator, newParams)
     returnLog('evaluateFunction', toReturn, params)
     return toReturn
@@ -63,6 +74,7 @@ let evaluateAny = (params) => {
     // evaluatingLog('evaluateAny', params)
     let operator = params[0];
     if(operator instanceof Array && operator[0] == 'lambda') params = evaluateLambda(params);
+    else if(operator instanceof Array) operator = evaluate(operator)
     const toReturn = evaluateFunction(params)
     // returnLog('evaluateAny', toReturn, params)
     return toReturn
@@ -85,6 +97,9 @@ let evaluate = (params) => {
         }
         returnLog('evaluate', `new definition for ${name} as ${JSON.stringify(todo)}`, params)
         return
+    }
+    if(operator == 'lambda') {
+        return params
     }
     const toReturn = evaluateAny([operator, ...params.slice(1).map(evaluate)]);
     returnLog('evaluate', toReturn, params)
@@ -111,6 +126,40 @@ let readRacket = (fileLocation: string): string => {
 }
 
 /**
+ * Reads racket code and gets all the isolated code chunks
+ * @param racket the Racket string
+ */
+let isolatedChunks = (racket: string): Array<string> => {
+    let breakOffPoints = []
+    let closed = true
+    let openParens = 0;
+    for(var i = 0; i < racket.length; i++) {
+        if(closed) {
+            breakOffPoints.push(i);
+            openParens = 0;
+        }
+
+        if(racket[i] == '(') {
+            closed = false;
+            openParens++;
+        }
+        if(racket[i] == ')') openParens--;
+        if(openParens == 0) closed = true;
+    }
+    if(closed) {
+        breakOffPoints.push(i);
+        openParens = 0;
+    }
+
+    let chunks = []
+    for(var i = 0; i < breakOffPoints.length - 1; i++) {
+        if(racket[breakOffPoints[i]].trim() != '') 
+            chunks.push(racket.substring(breakOffPoints[i], breakOffPoints[i+1]).trim());
+    }
+    return chunks
+}
+
+/**
  * Parses a racket expression
  * @param expression 
  */
@@ -134,7 +183,7 @@ let readExpression = (expression: string) => {
             else if(operationFound)
                 operation.push(val);
         })
-        return ['lambda', args, readExpression(operation.join(''))];
+        return ['lambda', args.join('').split(' '), readExpression(operation.join(''))];
     }
         
     expression = expression.substring(1, expression.length - 1)
@@ -163,9 +212,12 @@ let readExpression = (expression: string) => {
 
 let racket = readRacket('../assets/main.rkt')
 console.log("TO DECOMPOSE", racket)
-let exp = readExpression(racket);
-console.log(JSON.stringify(exp));
-let evaluatedLambda = evaluate(exp);
-console.log(JSON.stringify(evaluatedLambda))
-console.log(definedOps)
-console.log(defined('andy', 5))
+let chunks = isolatedChunks(racket)
+console.log("CHUNKS", chunks)
+chunks.map(x => evaluate(readExpression(x)))
+// let exp = readExpression(racket);
+// console.log(JSON.stringify(exp));
+// let evaluatedLambda = evaluate(exp);
+// console.log(JSON.stringify(evaluatedLambda))
+// console.log(definedOps)
+// console.log(defined('andy', 5))

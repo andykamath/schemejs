@@ -31,9 +31,20 @@ var definedOps = {
     "=": function (args) { return args.reduce(function (prev, current) { return evaluate(prev) == evaluate(current); }); },
     ">": function (args) { return args[0] > args[1]; },
     "if": function (args) { return evaluate(args[0]) ? evaluate(args[1]) : evaluate(args[2]); },
+    "zero?": function (args) { return evaluate(args) == 0; },
+    "cons": function (args) { return ["cons", args[0], args[1]]; }
 };
 var defined = function (op, params) {
     evaluatingLog(op, params);
+    // if(op instanceof Array && op[0] == 'lambda') {
+    //     console.log("LAMBDA PARAMS", params)
+    //     returnLog(op, "NEW FUNCTION", params)
+    //     return (terms) => {
+    //         if(terms instanceof Array) return evaluate([op, ...terms])
+    //         return evaluate([op, terms])
+    //     }
+    // }
+    console.log("USING OP", op, definedOps, definedOps[op]);
     var toReturn = definedOps[op](params);
     returnLog(op, toReturn, params);
     return toReturn;
@@ -47,7 +58,7 @@ var evaluateFunction = function (params) {
     var operator = params[0];
     if (operator == 'if')
         console.log("IF FOUND HERE");
-    var newParams = params.slice(1); //.map(evaluateFunction);
+    var newParams = params.slice(1);
     var toReturn = defined(operator, newParams);
     returnLog('evaluateFunction', toReturn, params);
     return toReturn;
@@ -75,6 +86,8 @@ var evaluateAny = function (params) {
     var operator = params[0];
     if (operator instanceof Array && operator[0] == 'lambda')
         params = evaluateLambda(params);
+    else if (operator instanceof Array)
+        operator = evaluate(operator);
     var toReturn = evaluateFunction(params);
     // returnLog('evaluateAny', toReturn, params)
     return toReturn;
@@ -98,6 +111,9 @@ var evaluate = function (params) {
         returnLog('evaluate', "new definition for " + name_1 + " as " + JSON.stringify(todo_1), params);
         return;
     }
+    if (operator == 'lambda') {
+        return params;
+    }
     var toReturn = evaluateAny(__spreadArrays([operator], params.slice(1).map(evaluate)));
     returnLog('evaluate', toReturn, params);
     return toReturn;
@@ -119,6 +135,39 @@ var replace = function (list, toReplace, replaceWith) {
  */
 var readRacket = function (fileLocation) {
     return fs_1.readFileSync(fileLocation, 'utf8').trim();
+};
+/**
+ * Reads racket code and gets all the isolated code chunks
+ * @param racket the Racket string
+ */
+var isolatedChunks = function (racket) {
+    var breakOffPoints = [];
+    var closed = true;
+    var openParens = 0;
+    for (var i = 0; i < racket.length; i++) {
+        if (closed) {
+            breakOffPoints.push(i);
+            openParens = 0;
+        }
+        if (racket[i] == '(') {
+            closed = false;
+            openParens++;
+        }
+        if (racket[i] == ')')
+            openParens--;
+        if (openParens == 0)
+            closed = true;
+    }
+    if (closed) {
+        breakOffPoints.push(i);
+        openParens = 0;
+    }
+    var chunks = [];
+    for (var i = 0; i < breakOffPoints.length - 1; i++) {
+        if (racket[breakOffPoints[i]].trim() != '')
+            chunks.push(racket.substring(breakOffPoints[i], breakOffPoints[i + 1]).trim());
+    }
+    return chunks;
 };
 /**
  * Parses a racket expression
@@ -145,7 +194,7 @@ var readExpression = function (expression) {
             else if (operationFound_1)
                 operation_1.push(val);
         });
-        return ['lambda', args_1, readExpression(operation_1.join(''))];
+        return ['lambda', args_1.join('').split(' '), readExpression(operation_1.join(''))];
     }
     expression = expression.substring(1, expression.length - 1);
     var total = [];
@@ -174,11 +223,12 @@ var readExpression = function (expression) {
 };
 var racket = readRacket('../assets/main.rkt');
 console.log("TO DECOMPOSE", racket);
-var exp = readExpression(racket);
-console.log(JSON.stringify(exp));
-var evaluatedLambda = evaluate(exp);
-console.log(JSON.stringify(evaluatedLambda));
-console.log(definedOps);
-console.log(defined('andy', 5));
-// console.log(evaluate(["andy", ["-", evaluate(2), evaluate(1)]]))
-// console.log(evaluateFunction(evaluatedLambda));
+var chunks = isolatedChunks(racket);
+console.log("CHUNKS", chunks);
+chunks.map(function (x) { return evaluate(readExpression(x)); });
+// let exp = readExpression(racket);
+// console.log(JSON.stringify(exp));
+// let evaluatedLambda = evaluate(exp);
+// console.log(JSON.stringify(evaluatedLambda))
+// console.log(definedOps)
+// console.log(defined('andy', 5))
