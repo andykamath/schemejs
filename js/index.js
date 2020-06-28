@@ -8,41 +8,58 @@ var __spreadArrays = (this && this.__spreadArrays) || function () {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 var fs_1 = require("fs");
-var defined = {
-    "+": function (args) { return args.reduce(function (prev, current) { return prev + current; }); },
-    "*": function (args) { return args.reduce(function (prev, current) { return prev * current; }); },
-    "-": function (args) { return args.reduce(function (prev, current) { return prev - current; }); },
-    "/": function (args) { return args.reduce(function (prev, current) { return prev / current; }); },
-    "if": function (args) {
-        console.log("IF HAS BEEN CALLED HERE", args);
-        if (evaluate(args[1]))
-            return evaluate(args[2]);
-        return evaluate(args[3]);
-    },
-    "=": function (args) { return args[0] == args[1]; },
-    ">": function (args) { return args[0] > args[1]; },
-    "define": function (args) {
-        console.log("DEFINE CALLED", args);
+var evaluatingLog = function (functionName) {
+    var params = [];
+    for (var _i = 1; _i < arguments.length; _i++) {
+        params[_i - 1] = arguments[_i];
     }
+    var paramString = JSON.stringify(params);
+    console.log("EVALUATING " + functionName + "(" + paramString.substring(1, paramString.length - 1) + ")");
+};
+var returnLog = function (functionName, toReturn) {
+    var params = [];
+    for (var _i = 2; _i < arguments.length; _i++) {
+        params[_i - 2] = arguments[_i];
+    }
+    var paramString = JSON.stringify(params);
+    console.log(functionName + "(" + paramString.substring(1, paramString.length - 1) + ") RETURNS " + JSON.stringify(toReturn));
+};
+var definedOps = {
+    "+": function (args) { return args.reduce(function (prev, current) { return evaluate(prev) + evaluate(current); }); },
+    "*": function (args) { return args.reduce(function (prev, current) { return evaluate(prev) * evaluate(current); }); },
+    "-": function (args) { return args.reduce(function (prev, current) { return evaluate(prev) - evaluate(current); }); },
+    "=": function (args) { return args.reduce(function (prev, current) { return evaluate(prev) == evaluate(current); }); },
+    ">": function (args) { return args[0] > args[1]; },
+    "if": function (args) { return evaluate(args[0]) ? evaluate(args[1]) : evaluate(args[2]); },
+};
+var defined = function (op, params) {
+    evaluatingLog(op, params);
+    var toReturn = definedOps[op](params);
+    returnLog(op, toReturn, params);
+    return toReturn;
 };
 var evaluateFunction = function (params) {
-    console.log("evaluateFunction", params);
-    if (!(params instanceof Array) || params.length == 1)
+    evaluatingLog('evaluateFunction', params);
+    if (!(params instanceof Array)) {
+        returnLog('evaluateFunction', params, params);
         return params;
+    }
     var operator = params[0];
-    var newParams = params.slice(1).map(evaluateFunction);
-    var toReturn = defined[operator](newParams);
-    console.log("evaluateFunction(" + JSON.stringify(params) + ") returns " + JSON.stringify(toReturn));
+    if (operator == 'if')
+        console.log("IF FOUND HERE");
+    var newParams = params.slice(1); //.map(evaluateFunction);
+    var toReturn = defined(operator, newParams);
+    returnLog('evaluateFunction', toReturn, params);
     return toReturn;
 };
 /**
  *
- * @param params The parameters with the operator - (+ x (* y 1))
- * @param args The arguments to the lambda - [x, y]
+ * @param params The parameters with the operator (+ x (* y 1))
+ * @param args The arguments to the lambda [x, y]
  * @param terms [20, 10]
  */
 var evaluateLambda = function (params) {
-    console.log("evaluateLambda", params);
+    evaluatingLog('evaluateLambda', params);
     var operator = params[0];
     var args = operator[1];
     var func = operator[2];
@@ -50,60 +67,49 @@ var evaluateLambda = function (params) {
     args.forEach(function (x, index) {
         func = replace(func, x, terms[index]);
     });
-    console.log("evaluateLambda(" + JSON.stringify(params) + ") returns " + JSON.stringify(func));
+    returnLog('evaluateLambda', func, params);
     return func;
 };
 var evaluateAny = function (params) {
-    console.log("evaluateAny", params);
+    // evaluatingLog('evaluateAny', params)
     var operator = params[0];
-    if (operator instanceof Array && operator[0] == 'lambda') {
-        var newParams = evaluateLambda(params);
-        var toReturn_1 = evaluateAny(newParams);
-        console.log("evaluateAny(" + JSON.stringify(params) + ") returns " + JSON.stringify(toReturn_1));
-        return toReturn_1;
-    }
-    if (operator == "if") {
-        return defined[operator](params);
-    }
+    if (operator instanceof Array && operator[0] == 'lambda')
+        params = evaluateLambda(params);
     var toReturn = evaluateFunction(params);
-    console.log("evaluateAny(" + JSON.stringify(params) + ") returns " + JSON.stringify(toReturn));
-};
-/**
- * Evaluates a function
- * @param params The params including the operator
- */
-var evaluate = function (params) {
-    console.log("evaluate", params);
-    var operator = params[0];
-    if (operator == "define") {
-        var funcName = params[1];
-        var operation_1 = params[2];
-        defined[funcName] = function (terms) { return evaluateAny(__spreadArrays([operation_1], terms)); };
-        console.log("evaluate(" + JSON.stringify(params) + ") defines " + funcName + " as evaluateAny([" + JSON.stringify(operation_1) + ", ...terms]})");
-        return;
-    }
-    console.log("OPERATOR:", operator);
-    console.log("PARAMS", params, params.slice(1));
-    var toReturn = evaluateAny(__spreadArrays([operator], params.slice(1).map(evaluateAny)));
-    console.log("evaluate(" + JSON.stringify(params) + ") returns " + JSON.stringify(toReturn));
+    // returnLog('evaluateAny', toReturn, params)
     return toReturn;
 };
-/**
- * Replaces a list containing arguments with the values to replace them with
- * @param list the list containing the arguments
- * @param toReplace the argument to replace
- * @param replaceWith the value to replace it with
- */
-var replace = function (list, toReplace, replaceWith) {
-    console.log("replace", toReplace, "with", replaceWith, "in", list);
-    if (!(list instanceof Array)) {
-        console.log("replace(" + JSON.stringify(list) + ", " + toReplace + ", " + replaceWith + ") returns " + JSON.stringify(list));
-        return list;
+var evaluate = function (params) {
+    evaluatingLog('evaluate', params);
+    // if params isn't an array, return it - it means it is data
+    if (!(params instanceof Array)) {
+        returnLog('evaluate', params, params);
+        return params;
     }
+    var operator = params[0];
+    if (operator == 'define') {
+        var name_1 = params[1];
+        var todo_1 = params[2];
+        definedOps[name_1] = function (terms) {
+            if (terms instanceof Array)
+                return evaluate(__spreadArrays([todo_1], terms));
+            return evaluate([todo_1, terms]);
+        };
+        returnLog('evaluate', "new definition for " + name_1 + " as " + JSON.stringify(todo_1), params);
+        return;
+    }
+    var toReturn = evaluateAny(__spreadArrays([operator], params.slice(1).map(evaluate)));
+    returnLog('evaluate', toReturn, params);
+    return toReturn;
+};
+var replace = function (list, toReplace, replaceWith) {
+    evaluatingLog('replace', list, toReplace, replaceWith);
+    if (!(list instanceof Array))
+        return list;
     var toReturn = list.map(function (x) { return (typeof x == 'string' || x instanceof String) ?
         ((x == toReplace) ? replaceWith : x) :
         replace(x, toReplace, replaceWith); });
-    console.log("replace(" + JSON.stringify(list) + ", " + toReplace + ", " + replaceWith + ") returns " + JSON.stringify(toReturn));
+    returnLog('replace', toReturn, list, toReplace, replaceWith);
     return toReturn;
 };
 /**
@@ -125,7 +131,7 @@ var readExpression = function (expression) {
     if (expression.substring(0, 7) == '(lambda') {
         expression = expression.substring(8, expression.length - 1);
         var args_1 = [];
-        var operation_2 = [];
+        var operation_1 = [];
         var argsFound_1 = false;
         var operationFound_1 = false;
         expression.split('').forEach(function (val, ind) {
@@ -137,9 +143,9 @@ var readExpression = function (expression) {
                 args_1.push(val);
             }
             else if (operationFound_1)
-                operation_2.push(val);
+                operation_1.push(val);
         });
-        return ['lambda', args_1, readExpression(operation_2.join(''))];
+        return ['lambda', args_1, readExpression(operation_1.join(''))];
     }
     expression = expression.substring(1, expression.length - 1);
     var total = [];
@@ -172,6 +178,7 @@ var exp = readExpression(racket);
 console.log(JSON.stringify(exp));
 var evaluatedLambda = evaluate(exp);
 console.log(JSON.stringify(evaluatedLambda));
-console.log(defined);
-console.log(defined['andy']([5]));
+console.log(definedOps);
+console.log(defined('andy', 5));
+// console.log(evaluate(["andy", ["-", evaluate(2), evaluate(1)]]))
 // console.log(evaluateFunction(evaluatedLambda));
