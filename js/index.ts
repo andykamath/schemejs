@@ -2,23 +2,40 @@ import { readFileSync } from 'fs';
 
 let defined = {
     "+": (args: Array<number>) => args.reduce((prev, current) => prev + current),
-    "*": (args: Array<number>) => args.reduce((prev, current) => prev * current)
+    "*": (args: Array<number>) => args.reduce((prev, current) => prev * current),
+    "-": (args: Array<number>) => args.reduce((prev, current) => prev - current),
+    "/": (args: Array<number>) => args.reduce((prev, current) => prev / current),
+    "if": (args: Array<number>) => {
+        console.log(`IF HAS BEEN CALLED HERE`, args)
+        if(evaluate(args[1]) )
+        return evaluate(args[2] )
+        return evaluate(args[3])
+    },
+    "=": (args: Array<number>) => args[0] == args[1],
+    ">": (args: Array<number>) => args[0] > args[1],
+    "define": (args: Array<number>) => {
+        console.log("DEFINE CALLED", args)
+    }
 }
 
 let evaluateFunction = (params) => {
-    if(!(params instanceof Array)) return params
+    console.log("evaluateFunction", params)
+    if(!(params instanceof Array) || params.length == 1) return params
     const operator = params[0];
-    params = params.slice(1).map(evaluateFunction);
-    return defined[operator](params)
+    const newParams = params.slice(1).map(evaluateFunction);
+    const toReturn = defined[operator](newParams)
+    console.log(`evaluateFunction(${JSON.stringify(params)}) returns ${JSON.stringify(toReturn)}`)
+    return toReturn
 }
 
 /**
  * 
- * @param params The parameters with the operator (+ x (* y 1))
- * @param args The arguments to the lambda [x, y]
+ * @param params The parameters with the operator - (+ x (* y 1))
+ * @param args The arguments to the lambda - [x, y]
  * @param terms [20, 10]
  */
 let evaluateLambda = (params) => {
+    console.log("evaluateLambda", params)
     const operator = params[0];
     const args = operator[1];
     let func = operator[2];
@@ -26,25 +43,64 @@ let evaluateLambda = (params) => {
     args.forEach((x, index) => {
         func = replace(func, x, terms[index])
     });
+    console.log(`evaluateLambda(${JSON.stringify(params)}) returns ${JSON.stringify(func)}`)
     return func
 }
 
 let evaluateAny = (params) => {
+    console.log("evaluateAny", params)
     let operator = params[0];
-    if(operator instanceof Array && operator[0] == 'lambda') params = evaluateLambda(params);
-    return evaluateFunction(params)
+    if(operator instanceof Array && operator[0] == 'lambda') {
+        const newParams = evaluateLambda(params);
+        const toReturn = evaluateAny(newParams)
+        console.log(`evaluateAny(${JSON.stringify(params)}) returns ${JSON.stringify(toReturn)}`)
+        return toReturn
+    }
+    if(operator == "if") {
+        return defined[operator](params)
+    }
+    const toReturn = evaluateFunction(params)
+    console.log(`evaluateAny(${JSON.stringify(params)}) returns ${JSON.stringify(toReturn)}`)
 }
 
+/**
+ * Evaluates a function
+ * @param params The params including the operator
+ */
 let evaluate = (params) => {
+    console.log("evaluate", params)
     let operator = params[0];
-    return evaluateAny([operator, ...params.slice(1).map(evaluateAny)]);
+    if(operator == "define") {
+        const funcName = params[1];
+        const operation = params[2];
+        defined[funcName] = (terms) => evaluateAny([operation, ...terms])
+        console.log(`evaluate(${JSON.stringify(params)}) defines ${funcName} as evaluateAny([${JSON.stringify(operation)}, ...terms]})`)
+        return
+    }
+    console.log("OPERATOR:", operator);
+    console.log("PARAMS", params, params.slice(1))
+    const toReturn = evaluateAny([operator, ...params.slice(1).map(evaluateAny)]);
+    console.log(`evaluate(${JSON.stringify(params)}) returns ${JSON.stringify(toReturn)}`)
+    return toReturn
 }
 
+/**
+ * Replaces a list containing arguments with the values to replace them with
+ * @param list the list containing the arguments
+ * @param toReplace the argument to replace
+ * @param replaceWith the value to replace it with
+ */
 let replace = (list, toReplace, replaceWith) => {
-    if(!(list instanceof Array)) return list
-    return list.map(x => (typeof x == 'string' || x instanceof String) ? 
+    console.log("replace", toReplace, "with", replaceWith, "in", list)
+    if(!(list instanceof Array)) {
+        console.log(`replace(${JSON.stringify(list)}, ${toReplace}, ${replaceWith}) returns ${JSON.stringify(list)}`)
+        return list
+    }
+    const toReturn = list.map(x => (typeof x == 'string' || x instanceof String) ? 
         ((x == toReplace) ? replaceWith : x) : 
         replace(x, toReplace, replaceWith))
+    console.log(`replace(${JSON.stringify(list)}, ${toReplace}, ${replaceWith}) returns ${JSON.stringify(toReturn)}`)
+    return toReturn
 }
 
 /**
@@ -80,7 +136,6 @@ let readExpression = (expression: string) => {
             else if(operationFound)
                 operation.push(val);
         })
-        // console.log(eval('(x) => defined["key"]')("b"))
         return ['lambda', args, readExpression(operation.join(''))];
     }
         
@@ -114,4 +169,6 @@ let exp = readExpression(racket);
 console.log(JSON.stringify(exp));
 let evaluatedLambda = evaluate(exp);
 console.log(JSON.stringify(evaluatedLambda))
+console.log(defined)
+console.log(defined['andy']([5]))
 // console.log(evaluateFunction(evaluatedLambda));
